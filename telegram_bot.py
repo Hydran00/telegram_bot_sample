@@ -5,12 +5,12 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, JobQueue, AIORateLimiter
-import os
 from urls import URL
-TOKEN = os.environ.get('TOKEN')
-
 import json, os, sys
 import random
+
+TOKEN = os.environ.get('TOKEN')
+
 SUBSCRIBERS_FILE = 'subscribers.json'
 
 # URL to monitor
@@ -22,9 +22,7 @@ USER_AGENTS = [
 ]
 
 
-
 print(URL.items())
-# URL = 'http://0.0.0.0:9000/'
 
 # Initialize an empty set for subscribers
 subscribed_users = set()
@@ -33,11 +31,7 @@ subscribed_users = set()
 initial_content = ['' for _ in range(len(URL))]
 
 # Check interval in seconds
-CHECK_INTERVAL = 1800 # 30 minutes
-
-    
-# List of subscribed users
-# subscribed_users = []
+CHECK_INTERVAL = 900 # 15 minutes
 
 
 # Function to load subscribers from file
@@ -71,7 +65,7 @@ def handle_exit():
             
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start the bot and send a welcome message."""
-    start_message = 'Hello grina! I will notify you of any changes on the following website:\n'+URL
+    start_message = 'Hello grina! I will notify you of any changes on the following website:\n'+ '\n'.join(URL.values())
     start_message += '\n\nUse /subscribe to receive change alerts.'
     start_message += '\nUse /unsubscribe to stop receiving change alerts.'
     # start_message += '\nUse /giorgio to '
@@ -81,14 +75,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Subscribe a user to change alerts."""
     user_id = update.message.chat_id
+    if user_id in subscribed_users:
+        return await update.message.reply_text('You are already subscribed.')
     if len(subscribed_users) >=2:
         return await update.message.reply_text('This is a private bot.')
     if user_id not in subscribed_users:
         subscribed_users.add(user_id)
         print(f"User {user_id} has subscribed.")
-        await update.message.reply_text('You have subscribed to change alerts.')
-    else:
-        await update.message.reply_text('You are already subscribed.')
+        return await update.message.reply_text('You have subscribed to change alerts.')
+        
 
 async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Unsubscribe a user from change alerts."""
