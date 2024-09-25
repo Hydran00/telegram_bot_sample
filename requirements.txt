@@ -1,0 +1,6 @@
+requests==2.28.2
+urllib3==1.26.5
+beautifulsoup4==4.10.0
+python-telegram-bot==21.6
+python-telegram-bot[rate-limiter]
+python-telegram-bot[job-queue]
