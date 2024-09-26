@@ -8,12 +8,21 @@ from telegram.ext import Application, CommandHandler, ContextTypes, JobQueue, AI
 from urls import URL
 import json, os, sys
 import random
+from datetime import datetime,time  as ttime# this imports the datetime class, not the module
+from zoneinfo import ZoneInfo
+
 
 TOKEN = os.environ.get('TOKEN')
-
 SUBSCRIBERS_FILE = 'subscribers.json'
 
-# URL to monitor
+# Define the time window in the target time zone
+TARGET_TIMEZONE = ZoneInfo("Europe/Rome")  # GMT+2
+START_TIME = ttime(7, 45)  # 07:45
+END_TIME = ttime(19, 0)    # 19:00
+MIN5_TIME_START = ttime(7, 45)   # 07:45
+MIN5_TIME_END = ttime(13, 0)     # 13:00
+
+COUNTER = -1
 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -21,6 +30,8 @@ USER_AGENTS = [
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36'
 ]
 
+# Check interval in seconds
+CHECK_INTERVAL = 300 # 5 minutes
 
 print(URL.items())
 
@@ -30,8 +41,6 @@ subscribed_users = set()
 # Initial content of the webpage
 initial_content = ['' for _ in range(len(URL))]
 
-# Check interval in seconds
-CHECK_INTERVAL = 900 # 15 minutes
 
 
 # Function to load subscribers from file
@@ -107,7 +116,8 @@ async def check_website(application: Application) -> None:
                 'User-Agent': random.choice(USER_AGENTS)
             }
             response = requests.get(url,headers=headers, timeout=10)
-            print(f"Checked the website for " + loc + " at time " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+            # print in GMT+2
+            print(f"Checked the website for " + loc + " at time " + datetime.now(TARGET_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S"))
 
             # Parse the webpage content with BeautifulSoup
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -131,7 +141,29 @@ async def check_website(application: Application) -> None:
 
 async def scheduled_check(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Scheduled task to repeatedly check the website."""
-    await check_website(context.application)
+    global TARGET_TIMEZONE, START_TIME, END_TIME, MIN5_TIME_START, MIN5_TIME_END, COUNTER
+
+    # Get the current time in the target time zone
+    now = datetime.now(TARGET_TIMEZONE)
+    now_time = now.time()
+
+
+    # Check if the current time is within the defined time window
+    if START_TIME <= now_time <= END_TIME:
+        if MIN5_TIME_START <= now_time <= MIN5_TIME_END:
+            # check every time
+            # print("5 min zone -> check every time")
+            return await check_website(context.application)
+        else:
+            # check every 15 minutes
+            COUNTER += 1
+            if COUNTER % 4 == 0:
+                # print("15 min zone -> check every 15 minutes")
+                return await check_website(context.application)
+            # else:
+                # print("15 min zone -> Skipping")
+    else:
+        return  # Do nothing if outside of the time window
 
 async def send_alert_to_users(message: str, application: Application) -> None:
     """Send an alert message to all subscribed users and via email."""
@@ -161,7 +193,7 @@ if __name__ == '__main__':
 
     # Schedule the website check function
     job_queue = application.job_queue
-    job_queue.run_repeating(scheduled_check, interval=CHECK_INTERVAL, first=20)
+    job_queue.run_repeating(scheduled_check, interval=CHECK_INTERVAL, first=4)
 
     # Load subscribers from file
     load_subscribers()
