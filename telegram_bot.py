@@ -8,11 +8,12 @@ from telegram.ext import Application, CommandHandler, ContextTypes, JobQueue, AI
 from urls import URL
 import json, os, sys
 import random
-from datetime import datetime,time  as ttime# this imports the datetime class, not the module
+from datetime import datetime,time  as ttime
 from zoneinfo import ZoneInfo
 
 
 TOKEN = os.environ.get('TOKEN')
+# list of IDs subscribed to the bot
 SUBSCRIBERS_FILE = 'subscribers.json'
 
 # Define the time window in the target time zone
@@ -110,7 +111,9 @@ async def check_website(application: Application) -> None:
         print("No users subscribed -> skipping check")
         return
     # Request the webpage content
-    for i, (loc, url) in enumerate(URL.items()):
+    for i, (loc, value) in enumerate(URL.items()):
+        url = value[0]
+        keyword = value[1]
         try:
             headers = {
                 'User-Agent': random.choice(USER_AGENTS)
@@ -126,11 +129,16 @@ async def check_website(application: Application) -> None:
             current_content = soup.get_text()
 
             # Compare with the initial content
+            
             if initial_content[i] and current_content != initial_content[i]:
-                alert_message = 'The monitored webpage of ' + loc + ' has changed!\n\n'
-                alert_message += 'Check the website at: ' + url
-                print(alert_message)
-                await send_alert_to_users(alert_message, application)
+                # check if the keyword is in the current content
+                if keyword in current_content:
+                    alert_message = 'The monitored webpage of ' + loc + ' has changed!\n\n'
+                    alert_message += 'Check the website at: ' + url
+                    print(alert_message)
+                    await send_alert_to_users(alert_message, application)
+                else:
+                    print("Changes detected but keyword not found.")
             else:
                 print("No changes detected.")
             # Update the initial content
